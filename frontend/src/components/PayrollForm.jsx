@@ -1,59 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Form, Button, Container, Row, Col, Alert } from 'react-bootstrap';
 import { createPayroll } from '../services/payrollService';
-import { getEmployees } from '../services/employeeService';
+import { getUsers } from '../services/userService';
 
 const PayrollForm = () => {
-  const [formData, setFormData] = useState({
-    employee: '',
-    payPeriod: { startDate: '', endDate: '' },
-    basicSalary: '',
-    allowances: [{ name: '', amount: '' }],
-    deductions: [{ name: '', amount: '' }]
-  });
-  const [netPay, setNetPay] = useState(0);
-  const [employees, setEmployees] = useState(null);
-  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const user = localStorage.getItem('currentUser');
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const loadEmployees = async () => {
-    if (user && employees === null) {
+  const [formData, setFormData] = useState({
+    employeeId: '',
+    month: '',
+    basicSalary: '',
+    allowances: '',
+    deductions: '',
+  });
+
+  useEffect(() => {
+    const loadUsers = async () => {
       try {
-        setLoading(true);
-        const employeeData = await getEmployees();
-        setEmployees(employeeData);
+        const data = await getUsers();
+        setUsers(data);
       } catch (err) {
-        console.error('Failed to load employees', err);
+        setError(err.response?.data?.message || 'Failed to load users');
       } finally {
         setLoading(false);
       }
-    }
-  };
-
-  useEffect(() => {
-    if (user && employees === null) {
-      loadEmployees();
-    }
-  }, [user, employees]);
-
-  useEffect(() => {
-    const basic = parseFloat(formData.basicSalary) || 0;
-    const totalAllowances = formData.allowances.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-    const totalDeductions = formData.deductions.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-    setNetPay(basic + totalAllowances - totalDeductions);
-  }, [formData]);
+    };
+    loadUsers();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handlePeriodChange = (e) => {
-    const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      payPeriod: { ...prev.payPeriod, [name]: value }
+      [name]: value
     }));
   };
 
@@ -63,194 +46,104 @@ const PayrollForm = () => {
       const payrollData = {
         ...formData,
         basicSalary: parseFloat(formData.basicSalary),
-        allowances: formData.allowances.map(item => ({
-          name: item.name,
-          amount: parseFloat(item.amount)
-        })),
-        deductions: formData.deductions.map(item => ({
-          name: item.name,
-          amount: parseFloat(item.amount)
-        })),
-        netPay
+        allowances: parseFloat(formData.allowances),
+        deductions: parseFloat(formData.deductions),
+        netSalary: parseFloat(formData.basicSalary) + parseFloat(formData.allowances) - parseFloat(formData.deductions)
       };
+
       await createPayroll(payrollData);
       navigate('/payrolls');
-    } catch (error) {
-      console.error('Failed to create payroll:', error);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to create payroll');
     }
   };
 
-  if (loading) return <div className="text-center my-4">Loading employees...</div>;
+  if (loading) return <div>Loading...</div>;
 
   return (
-    <div className="container my-5">
-      <h2 className="mb-4">Generate Payroll</h2>
-      <form onSubmit={handleSubmit} className="bg-light p-4 rounded shadow-sm">
-        {/* Employee */}
-        <div className="mb-3">
-          <label className="form-label">Employee</label>
-          <select
-            name="employee"
-            value={formData.employee}
+    <Container className="mt-4">
+      <h2>Create New Payroll</h2>
+      {error && <Alert variant="danger">{error}</Alert>}
+      
+      <Form onSubmit={handleSubmit}>
+        <Form.Group className="mb-3">
+          <Form.Label>Employee</Form.Label>
+          <Form.Select
+            name="employeeId"
+            value={formData.employeeId}
             onChange={handleChange}
-            className="form-select"
             required
           >
             <option value="">Select Employee</option>
-            {employees.map(emp => (
-              <option key={emp._id} value={emp._id}>
-                {emp.firstName} {emp.lastName}
+            {users.map(user => (
+              <option key={user._id} value={user._id}>
+                {user.firstName} {user.lastName} - {user.department}
               </option>
             ))}
-          </select>
-        </div>
+          </Form.Select>
+        </Form.Group>
 
-        {/* Basic Salary */}
-        <div className="mb-3">
-          <label className="form-label">Basic Salary</label>
-          <input
-            type="number"
-            name="basicSalary"
-            value={formData.basicSalary}
+        <Form.Group className="mb-3">
+          <Form.Label>Month</Form.Label>
+          <Form.Control
+            type="month"
+            name="month"
+            value={formData.month}
             onChange={handleChange}
-            className="form-control"
-            placeholder="0.00"
             required
           />
-        </div>
+        </Form.Group>
 
-        {/* Pay Period */}
-        <div className="row mb-3">
-          <div className="col">
-            <label className="form-label">Pay Period Start</label>
-            <input
-              type="date"
-              name="startDate"
-              value={formData.payPeriod.startDate}
-              onChange={handlePeriodChange}
-              className="form-control"
-              required
-            />
-          </div>
-          <div className="col">
-            <label className="form-label">Pay Period End</label>
-            <input
-              type="date"
-              name="endDate"
-              value={formData.payPeriod.endDate}
-              onChange={handlePeriodChange}
-              className="form-control"
-              required
-            />
-          </div>
-        </div>
+        <Row>
+          <Col md={4}>
+            <Form.Group className="mb-3">
+              <Form.Label>Basic Salary</Form.Label>
+              <Form.Control
+                type="number"
+                name="basicSalary"
+                value={formData.basicSalary}
+                onChange={handleChange}
+                required
+                min="0"
+                step="0.01"
+              />
+            </Form.Group>
+          </Col>
+          <Col md={4}>
+            <Form.Group className="mb-3">
+              <Form.Label>Allowances</Form.Label>
+              <Form.Control
+                type="number"
+                name="allowances"
+                value={formData.allowances}
+                onChange={handleChange}
+                required
+                min="0"
+                step="0.01"
+              />
+            </Form.Group>
+          </Col>
+          <Col md={4}>
+            <Form.Group className="mb-3">
+              <Form.Label>Deductions</Form.Label>
+              <Form.Control
+                type="number"
+                name="deductions"
+                value={formData.deductions}
+                onChange={handleChange}
+                required
+                min="0"
+                step="0.01"
+              />
+            </Form.Group>
+          </Col>
+        </Row>
 
-        {/* Allowances */}
-        <div className="mb-4">
-          <label className="form-label">Allowances</label>
-          {formData.allowances.map((item, index) => (
-            <div className="row mb-2" key={index}>
-              <div className="col">
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Allowance name"
-                  value={item.name}
-                  onChange={(e) => {
-                    const updated = [...formData.allowances];
-                    updated[index].name = e.target.value;
-                    setFormData({ ...formData, allowances: updated });
-                  }}
-                />
-              </div>
-              <div className="col">
-                <input
-                  type="number"
-                  className="form-control"
-                  placeholder="Amount"
-                  value={item.amount}
-                  onChange={(e) => {
-                    const updated = [...formData.allowances];
-                    updated[index].amount = e.target.value;
-                    setFormData({ ...formData, allowances: updated });
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-          <button
-            type="button"
-            className="btn btn-outline-primary btn-sm"
-            onClick={() =>
-              setFormData({ ...formData, allowances: [...formData.allowances, { name: '', amount: '' }] })
-            }
-          >
-            Add Allowance
-            Add Allowance
-            Add Allowance
-          </button>
-        </div>
-
-
-        {/* Deductions */}
-        <div className="mb-4">
-          <label className="form-label">Deductions</label>
-          {formData.deductions.map((item, index) => (
-            <div className="row mb-2" key={index}>
-              <div className="col">
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Deduction name"
-                  value={item.name}
-                  onChange={(e) => {
-                    const updated = [...formData.deductions];
-                    updated[index].name = e.target.value;
-                    setFormData({ ...formData, deductions: updated });
-                  }}
-                />
-              </div>
-              <div className="col">
-                <input
-                  type="number"
-                  className="form-control"
-                  placeholder="Amount"
-                  value={item.amount}
-                  onChange={(e) => {
-                    const updated = [...formData.deductions];
-                    updated[index].amount = e.target.value;
-                    setFormData({ ...formData, deductions: updated });
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-          <button
-            type="button"
-            className="btn btn-outline-danger btn-sm"
-            onClick={() =>
-              setFormData({ ...formData, deductions: [...formData.deductions, { name: '', amount: '' }] })
-            }
-          >
-            Add Deduction
-          </button>
-        </div>
-
-        {/* Payroll Summary */}
-        <div className="mb-4 border-top pt-3">
-          <h5>Payroll Summary</h5>
-          <p><strong>Basic Salary:</strong> ${parseFloat(formData.basicSalary || 0).toFixed(2)}</p>
-          <p><strong>Total Allowances:</strong> ${formData.allowances.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0).toFixed(2)}</p>
-          <p><strong>Total Deductions:</strong> ${formData.deductions.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0).toFixed(2)}</p>
-          <p><strong>Net Pay:</strong> ${netPay.toFixed(2)}</p>
-        </div>
-
-        {/* Submit */}
-        <button type="submit" className="btn btn-success w-100">
-          Generate Payroll
-        </button>
-      </form>
-    </div>
+        <Button variant="primary" type="submit">
+          Create Payroll
+        </Button>
+      </Form>
+    </Container>
   );
 };
 

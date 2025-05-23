@@ -1,174 +1,152 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import axios from 'axios';
-import { getEmployees } from '../services/employeeService'
-import { applyLeave, getLeavesById, updateLeave } from '../services/leaveService';
+import { useNavigate } from 'react-router-dom';
+import { Form, Button, Container, Row, Col, Card, Alert } from 'react-bootstrap';
+import { createLeave } from '../services/leaveService';
+import { getUsers } from '../services/userService';
+import { useAuth } from '../hooks/useAuth';
 
 const LeaveForm = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
   const [formData, setFormData] = useState({
-    employee: '',
-    leaveType: 'Vacation',
+    employeeId: user?._id || '',
     startDate: '',
     endDate: '',
+    leaveType: 'annual',
     reason: '',
-    status: 'Pending'
+    status: 'pending'
   });
-  const [employees, setEmployees] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const { id } = useParams();
-  const navigate = useNavigate();
 
-  // Fetch employees and leave data
   useEffect(() => {
-    const fetchData = async () => {
+    const loadUsers = async () => {
       try {
-        // Fetch employees list
-        const empRes = await getEmployees();
-        setEmployees(empRes);
-
-        // If editing, fetch leave data
-        if (id) {
-          const leaveRes = await getLeavesById(id);
-          setFormData(leaveRes);
-        }
+        const data = await getUsers();
+        setUsers(data);
       } catch (err) {
-        console.error('Error fetching data:', err);
+        setError(err.response?.data?.message || 'Failed to load users');
       } finally {
         setLoading(false);
       }
     };
-    fetchData();
-  }, [id]);
+    loadUsers();
+  }, []);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // For new leave requests
-      if (!id) {
-        // Get selected employee details
-        const selectedEmployee = employees.find(emp => emp._id === formData.employee);
-        const leaveWithEmployee = {
-          ...formData,
-          employeeName: `${selectedEmployee.firstName} ${selectedEmployee.lastName}`
-        };
-
-        await applyLeave(leaveWithEmployee)
-      } else {
-        // For editing existing leave
-        await updateLeave(id, formData)
-      }
+      await createLeave(formData);
       navigate('/leaves');
     } catch (err) {
-      console.error('Submission error:', {
-        error: err.response?.data || err.message,
-        config: err.config
-      });
+      setError(err.response?.data?.message || 'Failed to submit leave request');
     }
   };
 
-  const handleChange = e => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  if (loading) return <div className="container mt-4">Loading...</div>;
+  if (loading) return <div>Loading...</div>;
 
   return (
-    <div className="container mt-4">
-      <h2>{id ? 'Edit' : 'New'} Leave Request</h2>
-      <form onSubmit={handleSubmit}>
-        {!id && (
-          <div className="mb-3">
-            <label className="form-label">Employee</label>
-            <select
-              name="employee"
-              value={formData.employee}
-              onChange={handleChange}
-              className="form-select"
-              required={!id}
-              disabled={!!id} // Disable for edit mode
-            >
-              <option value="">Select Employee</option>
-              {employees.map(employee => (
-                <option key={employee._id} value={employee._id}>
-                  {employee.firstName} {employee.lastName}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-        
-        <div className="mb-3">
-          <label className="form-label">Leave Type</label>
-          <select
-            name="leaveType"
-            value={formData.leaveType}
-            onChange={handleChange}
-            className="form-select"
-            required
-          >
-            <option value="Vacation">Vacation</option>
-            <option value="Sick">Sick</option>
-            <option value="Personal">Personal</option>
-            <option value="Maternity/Paternity">Maternity/Paternity</option>
-            <option value="Bereavement">Bereavement</option>
-          </select>
-        </div>
+    <Container className="mt-4">
+      <Row className="justify-content-center">
+        <Col md={8}>
+          <Card>
+            <Card.Body>
+              <h2 className="text-center mb-4">Submit Leave Request</h2>
+              {error && <Alert variant="danger">{error}</Alert>}
+              
+              <Form onSubmit={handleSubmit}>
+                {user?.role === 'admin' && (
+                  <Form.Group className="mb-3">
+                    <Form.Label>Employee</Form.Label>
+                    <Form.Select
+                      name="employeeId"
+                      value={formData.employeeId}
+                      onChange={handleChange}
+                      required
+                    >
+                      <option value="">Select Employee</option>
+                      {users.map(user => (
+                        <option key={user._id} value={user._id}>
+                          {user.firstName} {user.lastName}
+                        </option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                )}
 
-        <div className="mb-3">
-          <label className="form-label">Status</label>
-          <select
-            name="status"
-            value={formData.status}
-            onChange={handleChange}
-            className="form-select"
-            required
-          >
-            <option value="Pending">Pending</option>
-            <option value="Approved">Approved</option>
-            <option value="Rejected">Rejected</option>
-          </select>
-        </div>
-        
-        <div className="mb-3">
-          <label className="form-label">Start Date</label>
-          <input
-            type="date"
-            name="startDate"
-            value={formData.startDate?.split('T')[0] || ''}
-            onChange={handleChange}
-            className="form-control"
-            required
-          />
-        </div>
-        
-        <div className="mb-3">
-          <label className="form-label">End Date</label>
-          <input
-            type="date"
-            name="endDate"
-            value={formData.endDate?.split('T')[0] || ''}
-            onChange={handleChange}
-            className="form-control"
-            required
-          />
-        </div>
-        
-        <div className="mb-3">
-          <label className="form-label">Reason</label>
-          <textarea
-            name="reason"
-            value={formData.reason}
-            onChange={handleChange}
-            className="form-control"
-            rows="3"
-          />
-        </div>
-        
-        <button type="submit" className="btn btn-primary">
-          Submit
-        </button>
-      </form>
-    </div>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Start Date</Form.Label>
+                      <Form.Control
+                        type="date"
+                        name="startDate"
+                        value={formData.startDate}
+                        onChange={handleChange}
+                        required
+                      />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>End Date</Form.Label>
+                      <Form.Control
+                        type="date"
+                        name="endDate"
+                        value={formData.endDate}
+                        onChange={handleChange}
+                        required
+                      />
+                    </Form.Group>
+                  </Col>
+                </Row>
+
+                <Form.Group className="mb-3">
+                  <Form.Label>Leave Type</Form.Label>
+                  <Form.Select
+                    name="leaveType"
+                    value={formData.leaveType}
+                    onChange={handleChange}
+                    required
+                  >
+                    <option value="annual">Annual Leave</option>
+                    <option value="sick">Sick Leave</option>
+                    <option value="personal">Personal Leave</option>
+                    <option value="unpaid">Unpaid Leave</option>
+                  </Form.Select>
+                </Form.Group>
+
+                <Form.Group className="mb-3">
+                  <Form.Label>Reason</Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={3}
+                    name="reason"
+                    value={formData.reason}
+                    onChange={handleChange}
+                    required
+                  />
+                </Form.Group>
+
+                <Button variant="primary" type="submit" className="w-100">
+                  Submit Leave Request
+                </Button>
+              </Form>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+    </Container>
   );
 };
 

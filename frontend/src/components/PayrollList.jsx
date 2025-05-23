@@ -1,108 +1,75 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { getPayrolls, deletePayroll } from '../services/payrollService';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Table, Button, Container, Alert } from 'react-bootstrap';
+import { getPayrolls } from '../services/payrollService';
 
 const PayrollList = () => {
+  const navigate = useNavigate();
   const [payrolls, setPayrolls] = useState([]);
+  const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchPayrolls = async () => {
+    const loadPayrolls = async () => {
       try {
-        const response = await getPayrolls();
-        setPayrolls(response.data);
-      } catch (error) {
-        console.error('Error fetching payrolls:', error);
+        const data = await getPayrolls();
+        setPayrolls(data);
+      } catch (err) {
+        setError(err.response?.data?.message || 'Failed to load payrolls');
       } finally {
         setLoading(false);
       }
     };
-    fetchPayrolls();
+    loadPayrolls();
   }, []);
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this payroll record?')) {
-      try {
-        await deletePayroll(id);
-        setPayrolls(payrolls.filter(payroll => payroll._id !== id));
-      } catch (error) {
-        console.error('Error deleting payroll:', error);
-      }
-    }
-  };
-
-  if (loading) return <div className="text-center my-4">Loading payrolls...</div>;
+  if (loading) return <div>Loading...</div>;
+  if (error) return <Alert variant="danger">Error: {error}</Alert>;
 
   return (
-    <div className="container my-5">
+    <Container className="mt-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2 className="h4">Payroll Records</h2>
-        <div>
-          <Link to="/payrolls/new" className="btn btn-primary me-2">
-            Generate Payroll
-          </Link>
-        </div>
+        <h2>Payroll List</h2>
+        <Button variant="primary" onClick={() => navigate('/payrolls/new')}>
+          Create New Payroll
+        </Button>
       </div>
 
-      <div className="table-responsive">
-        <table className="table table-bordered table-striped table-hover">
-          <thead className="table-light">
-            <tr>
-              <th>Employee</th>
-              <th>Pay Period</th>
-              <th>Basic Salary</th>
-              <th>Net Pay</th>
-              <th>Status</th>
-              <th>Actions</th>
+      <Table striped bordered hover responsive>
+        <thead>
+          <tr>
+            <th>Employee Name</th>
+            <th>Month</th>
+            <th>Basic Salary</th>
+            <th>Allowances</th>
+            <th>Deductions</th>
+            <th>Net Salary</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {payrolls.map((payroll) => (
+            <tr key={payroll._id}>
+              <td>{payroll.employeeName}</td>
+              <td>{new Date(payroll.month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</td>
+              <td>${payroll.basicSalary}</td>
+              <td>${payroll.allowances}</td>
+              <td>${payroll.deductions}</td>
+              <td>${payroll.netSalary}</td>
+              <td>
+                <Button
+                  variant="info"
+                  size="sm"
+                  onClick={() => navigate(`/payrolls/${payroll._id}`)}
+                >
+                  View
+                </Button>
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {payrolls.map((payroll) => (
-              <tr key={payroll._id}>
-                <td>{payroll.employee?.firstName} {payroll.employee?.lastName}</td>
-                <td>
-                  {new Date(payroll.payPeriod.startDate).toLocaleDateString()} -{' '}
-                  {new Date(payroll.payPeriod.endDate).toLocaleDateString()}
-                </td>
-                <td>${payroll.basicSalary.toFixed(2)}</td>
-                <td>${payroll.netPay.toFixed(2)}</td>
-                <td>
-                  <span className={`badge rounded-pill ${
-                    payroll.status === 'Paid' ? 'bg-success' :
-                    payroll.status === 'Approved' ? 'bg-primary' :
-                    payroll.status === 'Rejected' ? 'bg-danger' :
-                    'bg-warning text-dark'
-                  }`}>
-                    {payroll.status}
-                  </span>
-                </td>
-                <td>
-                  <Link
-                    to={`/payrolls/${payroll._id}`}
-                    className="btn btn-sm btn-outline-primary me-2"
-                  >
-                    View
-                  </Link>
-                  <button
-                    onClick={() => handleDelete(payroll._id)}
-                    className="btn btn-sm btn-outline-danger"
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {payrolls.length === 0 && (
-              <tr>
-                <td colSpan="5" className="text-center text-muted">
-                  No payroll records found.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+          ))}
+        </tbody>
+      </Table>
+    </Container>
   );
 };
 

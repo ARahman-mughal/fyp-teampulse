@@ -46,10 +46,18 @@ const loginUser = asyncHandler(async (req, res) => {
 
   if (user && (await user.comparePassword(password))) {
     res.json({
-      _id: user._id,
-      username: user.username,
+      id: user._id,
       email: user.email,
-      isAdmin: user.isAdmin,
+      username: user.username,
+      role: user.role,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phoneNumber: user.phoneNumber,
+      address: user.address,
+      dateOfBirth: user.dateOfBirth,
+      department: user.department,
+      position: user.position,
+      salary: user.salary,
       token: generateToken(user._id)
     });
   } else {

@@ -1,86 +1,130 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Form, Button, Container, Row, Col, Card, Alert } from 'react-bootstrap';
 import { register } from '../services/authService';
 
 const Register = () => {
+  const navigate = useNavigate();
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
-    username: '',
+    firstName: '',
+    lastName: '',
     email: '',
     password: '',
+    confirmPassword: '',
   });
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
     try {
       await register(formData);
-      navigate('/');
+      navigate('/login');
     } catch (err) {
-      setError('Registration failed. Please try again.');
+      setError(err.response?.data?.message || 'Registration failed');
     }
   };
 
   return (
-    <div className="container mt-5" style={{ maxWidth: '500px' }}>
-      <h2 className="mb-4 fw-bold text-center">Register</h2>
-      {error && <div className="alert alert-danger">{error}</div>}
-      <form onSubmit={handleSubmit}>
-        <div className="mb-3">
-          <label htmlFor="username" className="form-label">Username</label>
-          <input
-            type="text"
-            name="username"
-            id="username"
-            value={formData.username}
-            onChange={handleChange}
-            className="form-control"
-            required
-          />
-        </div>
-        <div className="mb-3">
-          <label htmlFor="email" className="form-label">Email address</label>
-          <input
-            type="email"
-            name="email"
-            id="email"
-            value={formData.email}
-            onChange={handleChange}
-            className="form-control"
-            required
-          />
-        </div>
-        <div className="mb-3">
-          <label htmlFor="password" className="form-label">Password</label>
-          <input
-            type="password"
-            name="password"
-            id="password"
-            value={formData.password}
-            onChange={handleChange}
-            className="form-control"
-            required
-            minLength="6"
-          />
-        </div>
-        <button type="submit" className="btn btn-primary w-100">
-          Register
-        </button>
-      </form>
-      <div className="text-center mt-3">
-        Already have an account?{' '}
-        <Link to="/login" className="text-decoration-none">
-          Login
-        </Link>
-      </div>
-    </div>
+    <Container className="mt-5">
+      <Row className="justify-content-center">
+        <Col md={6}>
+          <Card>
+            <Card.Body>
+              <h2 className="text-center mb-4">Register</h2>
+              {error && <Alert variant="danger">{error}</Alert>}
+              
+              <Form onSubmit={handleSubmit}>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>First Name</Form.Label>
+                      <Form.Control
+                        type="text"
+                        name="firstName"
+                        value={formData.firstName}
+                        onChange={handleChange}
+                        required
+                      />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Last Name</Form.Label>
+                      <Form.Control
+                        type="text"
+                        name="lastName"
+                        value={formData.lastName}
+                        onChange={handleChange}
+                        required
+                      />
+                    </Form.Group>
+                  </Col>
+                </Row>
+
+                <Form.Group className="mb-3">
+                  <Form.Label>Email</Form.Label>
+                  <Form.Control
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    required
+                  />
+                </Form.Group>
+
+                <Form.Group className="mb-3">
+                  <Form.Label>Password</Form.Label>
+                  <Form.Control
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    required
+                    minLength={6}
+                  />
+                </Form.Group>
+
+                <Form.Group className="mb-3">
+                  <Form.Label>Confirm Password</Form.Label>
+                  <Form.Control
+                    type="password"
+                    name="confirmPassword"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    required
+                    minLength={6}
+                  />
+                </Form.Group>
+
+                <Button variant="primary" type="submit" className="w-100">
+                  Register
+                </Button>
+              </Form>
+
+              <div className="text-center mt-3">
+                Already have an account?{' '}
+                <Button variant="link" onClick={() => navigate('/login')}>
+                  Login
+                </Button>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+    </Container>
   );
 };
 

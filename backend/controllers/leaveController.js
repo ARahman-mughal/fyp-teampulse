@@ -1,5 +1,4 @@
 const Leave = require('../models/Leave');
-const Employee = require('../models/Employee');
 
 // @desc    Create a new leave request
 // @route   POST /api/leaves

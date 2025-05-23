@@ -1,127 +1,100 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Table, Button, Alert, Spinner } from 'react-bootstrap';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Table, Button, Container, Alert, Badge } from 'react-bootstrap';
 import { getProjects } from '../services/projectService';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 
 const ProjectsList = () => {
-  const [projects, setProjects] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const navigate = useNavigate();
   const { user } = useAuth();
-
-  const isAdmin = user?.role === 'admin' || user?.isAdmin;
+  const [projects, setProjects] = useState([]);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchProjects = async () => {
+    const loadProjects = async () => {
       try {
-        setLoading(true);
-        setError(null);
         const data = await getProjects();
         setProjects(data);
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to load projects');
-        console.error('API Error:', err.response);
       } finally {
         setLoading(false);
       }
     };
-    fetchProjects();
+    loadProjects();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="text-center my-5">
-        <Spinner animation="border" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </Spinner>
-      </div>
-    );
-  }
+  if (loading) return <div>Loading...</div>;
+  if (error) return <Alert variant="danger">Error: {error}</Alert>;
+
+  // Filter projects based on user role
+  const filteredProjects = user?.role === 'admin' 
+    ? projects 
+    : projects.filter(project => project.teamMembers.includes(user?._id));
 
   return (
-    <div className="container py-4">
+    <Container className="mt-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2>Projects</h2>
-          <Link to="/projects/new" className="btn btn-primary">
-            Add Project
-          </Link>
+        {user?.role === 'admin' && (
+          <Button variant="primary" onClick={() => navigate('/projects/new')}>
+            Create New Project
+          </Button>
+        )}
       </div>
 
-      {error && (
-        <Alert variant="danger" className="mb-4" dismissible onClose={() => setError(null)}>
-          {error}
-          <Button variant="outline-danger" size="sm" className="ms-3" onClick={() => window.location.reload()}>
-            Retry
-          </Button>
-        </Alert>
-      )}
-
-      {projects.length > 0 ? (
-        <Table striped bordered hover responsive className="mt-3">
-          <thead className="table-dark">
-            <tr>
-              <th>Name</th>
-              <th>Description</th>
-              <th>Status</th>
-              <th>Actions</th>
+      <Table striped bordered hover responsive>
+        <thead>
+          <tr>
+            <th>Project Name</th>
+            <th>Status</th>
+            <th>Priority</th>
+            <th>Start Date</th>
+            <th>End Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filteredProjects.map((project) => (
+            <tr key={project._id}>
+              <td>{project.name}</td>
+              <td>
+                <Badge bg={
+                  project.status === 'completed' ? 'success' :
+                  project.status === 'in_progress' ? 'primary' :
+                  project.status === 'on_hold' ? 'warning' :
+                  'secondary'
+                }>
+                  {project.status.replace('_', ' ').charAt(0).toUpperCase() + project.status.slice(1)}
+                </Badge>
+              </td>
+              <td>
+                <Badge bg={
+                  project.priority === 'high' ? 'danger' :
+                  project.priority === 'medium' ? 'warning' :
+                  'info'
+                }>
+                  {project.priority.charAt(0).toUpperCase() + project.priority.slice(1)}
+                </Badge>
+              </td>
+              <td>{new Date(project.startDate).toLocaleDateString()}</td>
+              <td>{project.endDate ? new Date(project.endDate).toLocaleDateString() : 'N/A'}</td>
+              <td>
+                <Button
+                  variant="info"
+                  size="sm"
+                  onClick={() => navigate(`/projects/${project._id}`)}
+                >
+                  View
+                </Button>
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {projects.map((project) => (
-              <tr key={project._id}>
-                <td>
-                  <Link to={`/projects/${project._id}`}>{project.name}</Link>
-                </td>
-                <td>{project.description || '-'}</td>
-                <td>
-                  <span className={`badge bg-${getStatusVariant(project.status)}`}>
-                    {project.status}
-                  </span>
-                </td>
-                <td>
-                  <div className="d-flex gap-2">
-                    <Link
-                      to={`/projects/${project._id}`}
-                      className="btn btn-sm btn-outline-primary"
-                    >
-                      View
-                    </Link>
-                    {isAdmin && (
-                      <Link
-                        to={`/projects/${project._id}/edit`}
-                        className="btn btn-sm btn-outline-secondary"
-                      >
-                        Edit
-                      </Link>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      ) : (
-        <div className="text-center py-5 border rounded">
-          <i className="fas fa-folder-open fa-3x text-muted mb-3"></i>
-          <h4>No Projects Found</h4>
-          <p className="text-muted mb-4">Get started by creating your first project</p>
-          <Link to="/projects/new" className="btn btn-primary">
-            <i className="fas fa-plus me-2"></i>Create Project
-          </Link>
-        </div>
-      )}
-    </div>
+          ))}
+        </tbody>
+      </Table>
+    </Container>
   );
-};
-
-const getStatusVariant = (status) => {
-  switch (status) {
-    case 'Completed': return 'success';
-    case 'In Progress': return 'primary';
-    case 'On Hold': return 'warning';
-    default: return 'secondary';
-  }
 };
 
 export default ProjectsList;

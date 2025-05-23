@@ -1,210 +1,207 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Form, Button, Row, Col, Alert, Spinner } from 'react-bootstrap';
-import { getEmployees } from '../services/employeeService';
-import { createProject, getProjectById, updateProject } from '../services/projectService';
-import { useAuth } from '../context/AuthContext';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Form, Button, Container, Row, Col, Card, Alert } from 'react-bootstrap';
+import { createProject } from '../services/projectService';
+import { getUsers } from '../services/userService';
+import { useAuth } from '../hooks/useAuth';
 
 const ProjectForm = () => {
   const navigate = useNavigate();
-  const { id } = useParams();
   const { user } = useAuth();
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const [employees, setEmployees] = useState([]);
-  const [project, setProject] = useState({
+  const [formData, setFormData] = useState({
     name: '',
     description: '',
     startDate: '',
     endDate: '',
-    status: 'Planning',
-    employees: [],
+    status: 'planning',
+    teamMembers: [],
+    budget: '',
+    priority: 'medium',
+    createdBy: user?._id,
   });
 
-  const [loading, setLoading] = useState(false);
-  const [formLoading, setFormLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [validationError, setValidationError] = useState(null);
-
   useEffect(() => {
-    const fetchData = async () => {
+    const loadUsers = async () => {
       try {
-        setError(null);
-        const [employeeData, projectData] = await Promise.all([
-          getEmployees(),
-          id ? getProjectById(id) : Promise.resolve(null)
-        ]);
-        setEmployees(employeeData);
-        if (projectData) setProject(projectData);
+        const data = await getUsers();
+        setUsers(data);
       } catch (err) {
-        setError(err?.response?.data?.message || 'Failed to load data');
-        console.error('Form load error:', err);
+        setError(err.response?.data?.message || 'Failed to load users');
       } finally {
-        setFormLoading(false);
+        setLoading(false);
       }
     };
-
-    fetchData();
-  }, [id]);
+    loadUsers();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setProject(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleEmployeeSelect = (e) => {
-    const selected = Array.from(e.target.selectedOptions, option => option.value);
-    setProject(prev => ({ ...prev, employees: selected }));
-  };
-
-  const validateForm = () => {
-    if (!project.name || !project.startDate) {
-      return 'Project Name and Start Date are required.';
+    if (name === 'teamMembers') {
+      const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+      setFormData(prev => ({
+        ...prev,
+        teamMembers: selectedOptions
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
     }
-    if (project.endDate && project.endDate < project.startDate) {
-      return 'End Date cannot be earlier than Start Date.';
-    }
-    return null;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    const validationMsg = validateForm();
-    if (validationMsg) {
-      setValidationError(validationMsg);
-      return;
-    }
-
     try {
-      setLoading(true);
-      setValidationError(null);
-      setError(null);
-
-      const payload = {
-        ...project,
-        createdBy: user._id
-      };
-
-      if (id) {
-        await updateProject(id, payload);
-      } else {
-        await createProject(payload);
-      }
-
-      navigate('/projects', {
-        state: { success: `Project ${id ? 'updated' : 'created'} successfully!` }
+      await createProject({
+        ...formData,
+        budget: parseFloat(formData.budget)
       });
+      navigate('/projects');
     } catch (err) {
-      setError(err?.response?.data?.message || 'Failed to save project');
-      console.error('Save error:', err);
-    } finally {
-      setLoading(false);
+      setError(err.response?.data?.message || 'Failed to create project');
     }
   };
 
-  if (formLoading) {
-    return (
-      <div className="text-center my-5">
-        <Spinner animation="border" />
-        <p>Loading form...</p>
-      </div>
-    );
-  }
+  if (loading) return <div>Loading...</div>;
 
   return (
-    <div className="container my-4">
-      <h2 className="mb-4">{id ? 'Edit Project' : 'Create New Project'}</h2>
+    <Container className="mt-4">
+      <Row className="justify-content-center">
+        <Col md={8}>
+          <Card>
+            <Card.Body>
+              <h2 className="text-center mb-4">Create New Project</h2>
+              {error && <Alert variant="danger">{error}</Alert>}
+              
+              <Form onSubmit={handleSubmit}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Project Name</Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    required
+                  />
+                </Form.Group>
 
-      {error && <Alert variant="danger">{error}</Alert>}
-      {validationError && <Alert variant="warning">{validationError}</Alert>}
+                <Form.Group className="mb-3">
+                  <Form.Label>Description</Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={3}
+                    name="description"
+                    value={formData.description}
+                    onChange={handleChange}
+                    required
+                  />
+                </Form.Group>
 
-      <Form onSubmit={handleSubmit}>
-        <Row className="mb-3">
-          <Form.Group as={Col} md={6}>
-            <Form.Label>Project Name *</Form.Label>
-            <Form.Control
-              type="text"
-              name="name"
-              value={project.name}
-              onChange={handleChange}
-              required
-            />
-          </Form.Group>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Start Date</Form.Label>
+                      <Form.Control
+                        type="date"
+                        name="startDate"
+                        value={formData.startDate}
+                        onChange={handleChange}
+                        required
+                      />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>End Date</Form.Label>
+                      <Form.Control
+                        type="date"
+                        name="endDate"
+                        value={formData.endDate}
+                        onChange={handleChange}
+                        required
+                      />
+                    </Form.Group>
+                  </Col>
+                </Row>
 
-          <Form.Group as={Col} md={6}>
-            <Form.Label>Status</Form.Label>
-            <Form.Select
-              name="status"
-              value={project.status}
-              onChange={handleChange}
-            >
-              <option value="Planning">Planning</option>
-              <option value="In Progress">In Progress</option>
-              <option value="On Hold">On Hold</option>
-              <option value="Completed">Completed</option>
-            </Form.Select>
-          </Form.Group>
-        </Row>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Status</Form.Label>
+                      <Form.Select
+                        name="status"
+                        value={formData.status}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="planning">Planning</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                        <option value="on_hold">On Hold</option>
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Priority</Form.Label>
+                      <Form.Select
+                        name="priority"
+                        value={formData.priority}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                </Row>
 
-        <Form.Group className="mb-3">
-          <Form.Label>Description</Form.Label>
-          <Form.Control
-            as="textarea"
-            name="description"
-            rows={3}
-            value={project.description}
-            onChange={handleChange}
-            placeholder="Enter a brief description of the project..."
-          />
-        </Form.Group>
+                <Form.Group className="mb-3">
+                  <Form.Label>Team Members</Form.Label>
+                  <Form.Select
+                    multiple
+                    name="teamMembers"
+                    value={formData.teamMembers}
+                    onChange={handleChange}
+                    required
+                  >
+                    {users.map(user => (
+                      <option key={user._id} value={user._id}>
+                        {user.firstName} {user.lastName} - {user.department}
+                      </option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
 
-        <Row className="mb-3">
-          <Form.Group as={Col} md={6}>
-            <Form.Label>Start Date *</Form.Label>
-            <Form.Control
-              type="date"
-              name="startDate"
-              value={project.startDate}
-              onChange={handleChange}
-              required
-            />
-          </Form.Group>
+                <Form.Group className="mb-3">
+                  <Form.Label>Budget</Form.Label>
+                  <Form.Control
+                    type="number"
+                    name="budget"
+                    value={formData.budget}
+                    onChange={handleChange}
+                    required
+                    min="0"
+                    step="0.01"
+                  />
+                </Form.Group>
 
-          <Form.Group as={Col} md={6}>
-            <Form.Label>End Date</Form.Label>
-            <Form.Control
-              type="date"
-              name="endDate"
-              value={project.endDate}
-              onChange={handleChange}
-              min={project.startDate}
-            />
-          </Form.Group>
-        </Row>
-
-        <Form.Group className="mb-4">
-          <Form.Label>Assign Team Members</Form.Label>
-          <Form.Select
-            multiple
-            name="employees"
-            value={project.employees}
-            onChange={handleEmployeeSelect}
-          >
-            {employees.map(emp => (
-              <option key={emp._id} value={emp._id}>
-                {emp.firstName} {emp.lastName}
-              </option>
-            ))}
-          </Form.Select>
-        </Form.Group>
-
-        <div className="d-flex justify-content-end">
-          <Button type="submit" variant="success" disabled={loading}>
-            {loading ? 'Saving...' : id ? 'Update Project' : 'Create Project'}
-          </Button>
-        </div>
-      </Form>
-    </div>
+                <Button variant="primary" type="submit" className="w-100">
+                  Create Project
+                </Button>
+              </Form>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+    </Container>
   );
 };
 

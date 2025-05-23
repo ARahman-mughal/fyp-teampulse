@@ -1,52 +1,100 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { getLeavesById } from '../services/leaveService';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Card, Button, Container, Row, Col, Badge, Alert } from 'react-bootstrap';
+import { getLeaveById, updateLeave } from '../services/leaveService';
+import { useAuth } from '../hooks/useAuth';
 
 const LeaveDetails = () => {
-  const [leave, setLeave] = useState(null);
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [leave, setLeave] = useState(null);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchLeave = async () => {
+    const loadLeave = async () => {
       try {
-        const res = await getLeavesById(id);
-        setLeave(res);
+        const data = await getLeaveById(id);
+        setLeave(data);
       } catch (err) {
-        console.error(err);
+        setError(err.response?.data?.message || 'Failed to load leave request');
+      } finally {
+        setLoading(false);
       }
     };
-    fetchLeave();
+    loadLeave();
   }, [id]);
 
-  if (!leave) return <div>Loading...</div>;
+  const handleStatusUpdate = async (newStatus) => {
+    try {
+      const updatedLeave = await updateLeave(id, { status: newStatus });
+      setLeave(updatedLeave);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update leave status');
+    }
+  };
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <Alert variant="danger">Error: {error}</Alert>;
+  if (!leave) return <Alert variant="warning">Leave request not found</Alert>;
 
   return (
-    <div className="container mt-4">
-      <h2>Leave Request Details</h2>
-      <div className="card">
-        <div className="card-body">
-          <h5 className="card-title">{leave.leaveType} Leave</h5>
-          <p className="card-text">
-            <strong>Dates:</strong> {new Date(leave.startDate).toLocaleDateString()} to {new Date(leave.endDate).toLocaleDateString()}
-          </p>
-          <p className="card-text">
-            <strong>Status:</strong> 
-            <span className={`badge ${leave.status === 'Approved' ? 'bg-success' : leave.status === 'Rejected' ? 'bg-danger' : 'bg-warning'}`}>
-              {leave.status}
-            </span>
-          </p>
-          <p className="card-text">
-            <strong>Reason:</strong> {leave.reason || 'N/A'}
-          </p>
-          <Link to="/leaves" className="btn btn-secondary me-2">
-            Back
-          </Link>
-          <Link to={`/leaves/${leave._id}/edit`} className="btn btn-primary">
-            Edit
-          </Link>
-        </div>
-      </div>
-    </div>
+    <Container className="mt-4">
+      <Card>
+        <Card.Header className="d-flex justify-content-between align-items-center">
+          <h3>Leave Request Details</h3>
+          <Badge bg={
+            leave.status === 'approved' ? 'success' :
+            leave.status === 'rejected' ? 'danger' :
+            'warning'
+          }>
+            {leave.status.charAt(0).toUpperCase() + leave.status.slice(1)}
+          </Badge>
+        </Card.Header>
+        <Card.Body>
+          <Row>
+            <Col md={6}>
+              <p><strong>Employee:</strong> {leave.employeeName}</p>
+              <p><strong>Leave Type:</strong> {leave.leaveType}</p>
+              <p><strong>Start Date:</strong> {new Date(leave.startDate).toLocaleDateString()}</p>
+              <p><strong>End Date:</strong> {new Date(leave.endDate).toLocaleDateString()}</p>
+            </Col>
+            <Col md={6}>
+              <p><strong>Reason:</strong></p>
+              <p>{leave.reason}</p>
+            </Col>
+          </Row>
+
+          {user?.role === 'admin' && leave.status === 'pending' && (
+            <div className="mt-3">
+              <Button
+                variant="success"
+                className="me-2"
+                onClick={() => handleStatusUpdate('approved')}
+              >
+                Approve
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => handleStatusUpdate('rejected')}
+              >
+                Reject
+              </Button>
+            </div>
+          )}
+
+          <div className="mt-3">
+            <Button
+              variant="secondary"
+              onClick={() => navigate('/leaves')}
+            >
+              Back to List
+            </Button>
+          </div>
+        </Card.Body>
+      </Card>
+    </Container>
   );
 };
 

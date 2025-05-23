@@ -9,7 +9,6 @@ const directoryName = __dirname;
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
-const employeesRoutes = require('./routes/employeeRoutes');
 const payrollsRoutes = require('./routes/payrollsRoutes');
 const projectRoutes = require('./routes/projectRoutes');
 const leaveRoutes = require('./routes/leaveRoutes')
@@ -45,7 +44,6 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/employee_
 
 // API Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/employees', employeesRoutes);
 app.use('/api/payrolls', payrollsRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/leaves', leaveRoutes)

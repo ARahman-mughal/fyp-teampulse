@@ -1,34 +1,52 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import axios from 'axios';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Table, Button, Container, Alert } from 'react-bootstrap';
 import { getLeaves } from '../services/leaveService';
+import { useAuth } from '../hooks/useAuth';
 
 const LeavesList = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [leaves, setLeaves] = useState([]);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchLeaves = async () => {
+    const loadLeaves = async () => {
       try {
-        const res = await getLeaves();
-        setLeaves(res);
+        const data = await getLeaves();
+        setLeaves(data);
       } catch (err) {
-        console.error(err);
+        setError(err.response?.data?.message || 'Failed to load leaves');
+      } finally {
+        setLoading(false);
       }
     };
-    fetchLeaves();
+    loadLeaves();
   }, []);
 
+  if (loading) return <div>Loading...</div>;
+  if (error) return <Alert variant="danger">Error: {error}</Alert>;
+
+  // Filter leaves based on user role
+  const filteredLeaves = user?.role === 'admin' 
+    ? leaves 
+    : leaves.filter(leave => leave.employeeId === user?._id);
+
   return (
-    <div className="container mt-4">
-      <h2>Leave Requests</h2>
-      <Link to="/leaves/new" className="btn btn-primary mb-3">
-        New Leave Request
-      </Link>
-      <table className="table">
+    <Container className="mt-4">
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h2>Leave Requests</h2>
+        <Button variant="primary" onClick={() => navigate('/leaves/new')}>
+          New Leave Request
+        </Button>
+      </div>
+
+      <Table striped bordered hover responsive>
         <thead>
           <tr>
             <th>Employee</th>
-            <th>Type</th>
+            <th>Leave Type</th>
             <th>Start Date</th>
             <th>End Date</th>
             <th>Status</th>
@@ -36,35 +54,35 @@ const LeavesList = () => {
           </tr>
         </thead>
         <tbody>
-          {leaves.map(leave => (
+          {filteredLeaves.map((leave) => (
             <tr key={leave._id}>
-              <td>
-                {leave.employeeName || 
-                 (leave.employee?.firstName && leave.employee?.lastName ? 
-                  `${leave.employee.firstName} ${leave.employee.lastName}` : 
-                  'N/A')}
-              </td>
+              <td>{leave.employeeName}</td>
               <td>{leave.leaveType}</td>
               <td>{new Date(leave.startDate).toLocaleDateString()}</td>
               <td>{new Date(leave.endDate).toLocaleDateString()}</td>
               <td>
-                <span className={`badge ${leave.status === 'Approved' ? 'bg-success' : leave.status === 'Rejected' ? 'bg-danger' : 'bg-warning'}`}>
-                  {leave.status}
+                <span className={`badge bg-${
+                  leave.status === 'approved' ? 'success' :
+                  leave.status === 'rejected' ? 'danger' :
+                  'warning'
+                }`}>
+                  {leave.status.charAt(0).toUpperCase() + leave.status.slice(1)}
                 </span>
               </td>
               <td>
-                <Link to={`/leaves/${leave._id}`} className="btn btn-sm btn-info me-2">
+                <Button
+                  variant="info"
+                  size="sm"
+                  onClick={() => navigate(`/leaves/${leave._id}`)}
+                >
                   View
-                </Link>
-                <Link to={`/leaves/${leave._id}/edit`} className="btn btn-sm btn-secondary">
-                  Edit
-                </Link>
+                </Button>
               </td>
             </tr>
           ))}
         </tbody>
-      </table>
-    </div>
+      </Table>
+    </Container>
   );
 };
 

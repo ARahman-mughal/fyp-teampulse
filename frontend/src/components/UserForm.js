@@ -1,19 +1,14 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Form, Button, Container, Row, Col, Card, Alert } from 'react-bootstrap';
-import { useGetUserByIdQuery, useUpdateUserMutation, useCreateUserMutation } from '../services/api';
+import { createUser, updateUser, getUserById } from '../services/userService';
 
-const EmployeeForm = ({ id }) => {
+const UserForm = () => {
   const navigate = useNavigate();
+  const { id } = useParams();
   const isEdit = Boolean(id);
+  const [loading, setLoading] = useState(isEdit);
   const [error, setError] = useState('');
-
-  const { data: userData, isLoading: isLoadingUser } = useGetUserByIdQuery(id, {
-    skip: !isEdit
-  });
-
-  const [updateUser] = useUpdateUserMutation();
-  const [createUser] = useCreateUserMutation();
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -29,15 +24,21 @@ const EmployeeForm = ({ id }) => {
     salary: '',
   });
 
-  // Update form data when user data is loaded
-  React.useEffect(() => {
-    if (userData) {
-      setFormData({
-        ...userData,
-        password: '' // Don't populate password field
-      });
-    }
-  }, [userData]);
+  useEffect(() => {
+    const loadUser = async () => {
+      if (isEdit) {
+        try {
+          const data = await getUserById(id);
+          setFormData({ ...data, password: '' });
+        } catch (err) {
+          setError(err.response?.data?.message || 'Failed to load user');
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    loadUser();
+  }, [id, isEdit]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -51,17 +52,17 @@ const EmployeeForm = ({ id }) => {
     e.preventDefault();
     try {
       if (isEdit) {
-        await updateUser({ id, ...formData }).unwrap();
+        await updateUser(id, formData);
       } else {
-        await createUser(formData).unwrap();
+        await createUser(formData);
       }
-      navigate('/employees');
+      navigate('/users');
     } catch (err) {
-      setError(err.data?.message || 'Failed to save employee');
+      setError(err.response?.data?.message || 'Failed to save user');
     }
   };
 
-  if (isEdit && isLoadingUser) return <div>Loading...</div>;
+  if (loading) return <div>Loading...</div>;
 
   return (
     <Container className="mt-4">
@@ -69,7 +70,7 @@ const EmployeeForm = ({ id }) => {
         <Col md={8}>
           <Card>
             <Card.Body>
-              <h2 className="text-center mb-4">{isEdit ? 'Edit Employee' : 'Add New Employee'}</h2>
+              <h2 className="text-center mb-4">{isEdit ? 'Edit User' : 'Create User'}</h2>
               {error && <Alert variant="danger">{error}</Alert>}
               
               <Form onSubmit={handleSubmit}>
@@ -218,7 +219,7 @@ const EmployeeForm = ({ id }) => {
                 </Form.Group>
 
                 <Button variant="primary" type="submit" className="w-100">
-                  {isEdit ? 'Update Employee' : 'Add Employee'}
+                  {isEdit ? 'Update User' : 'Create User'}
                 </Button>
               </Form>
             </Card.Body>
@@ -229,4 +230,4 @@ const EmployeeForm = ({ id }) => {
   );
 };
 
-export default EmployeeForm; 
+export default UserForm; 

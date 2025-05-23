@@ -1,98 +1,78 @@
-import API from './api';
+import axios from 'axios';
+import store from '../store';
+import { setCredentials, logout as logoutAction } from '../store/slices/authSlice';
 
-// Helper function for consistent error handling
-const handleAuthError = (error) => {
-  console.error('Auth Error:', {
-    status: error.response?.status,
-    message: error.message,
-    response: error.response?.data
-  });
-  
-  let userMessage = 'Authentication failed';
-  if (error.response) {
-    userMessage = error.response.data?.message || 
-                 error.response.statusText || 
-                 `Server responded with ${error.response.status}`;
-  } else if (error.request) {
-    userMessage = 'No response from server';
+const API_URL = 'http://localhost:5000/api/auth';
+
+const api = axios.create({
+  baseURL: API_URL,
+  headers: {
+    'Content-Type': 'application/json'
   }
-  
-  throw new Error(userMessage);
+});
+
+// Add request interceptor to add token
+api.interceptors.request.use(
+  (config) => {
+    const token = store.getState().auth.token;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Login user
+export const login = async (credentials) => {
+  const response = await api.post('/login', credentials);
+  if (response.data.token) {
+    const { token, user } = response.data;
+    // Save to localStorage
+    localStorage.setItem('user', JSON.stringify({ token, user }));
+    // Update Redux store
+    store.dispatch(setCredentials({ user, token }));
+  }
+  return response.data;
 };
 
+// Register user
 export const register = async (userData) => {
-  try {
-    // Basic validation
-    if (!userData.email || !userData.password) {
-      throw new Error('Email and password are required');
-    }
-
-    const response = await API.post('/auth/register', userData);
-    
-    if (response.data?.token) {
-      localStorage.setItem('userToken', response.data.token);
-      if (response.data.user) {
-        localStorage.setItem('currentUser', JSON.stringify(response.data.user));
-      }
-    }
-    
-    return response.data;
-  } catch (error) {
-    return handleAuthError(error);
-  }
+  const response = await api.post('/register', userData);
+  return response.data;
 };
 
-export const login = async (userData) => {
-  try {
-    const response = await API.post('/auth/login', userData);
-    
-    if (response.data?.token) {
-      const { token, ...user } = response.data;
-      localStorage.setItem('userToken', token);
-      localStorage.setItem('currentUser', JSON.stringify(user));
-    }
-    
-    return response.data;
-  } catch (error) {
-    return handleAuthError(error);
-  }
-};
-
-export const getProfile = async (payload) => {
-  try {
-    const token = localStorage.getItem('userToken');
-    if (!token) throw new Error('No authentication token found');
-
-    const response = await API.get('/auth/profile', {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
-    
-    return response.data;
-  } catch (error) {
-    return handleAuthError(error);
-  }
-};
-
+// Logout user
 export const logout = () => {
-  try {
-    localStorage.removeItem('userToken');
-    localStorage.removeItem('currentUser');
-    // Optional: Make API call to invalidate token on server
-    return { success: true };
-  } catch (error) {
-    console.error('Logout error:', error);
-    return { success: false, error: error.message };
-  }
+  localStorage.removeItem('user');
+  store.dispatch(logoutAction());
 };
 
-// Additional helper methods
+// Get current user
 export const getCurrentUser = () => {
-  const user = localStorage.getItem('currentUser');
-  return user ? JSON.parse(user) : null;
+  const userData = localStorage.getItem('user');
+  if (userData) {
+    const parsedData = JSON.parse(userData);
+    // Sync with Redux store
+    store.dispatch(setCredentials({
+      user: parsedData.user,
+      token: parsedData.token
+    }));
+    return parsedData.user;
+  }
+  return null;
 };
 
-export const isAuthenticated = () => {
-  return !!localStorage.getItem('userToken');
-};
+// Update user in localStorage when Redux store changes
+export const syncUserToStorage = (userData) => {
+  const currentData = localStorage.getItem('user');
+  if (currentData) {
+    const parsedData = JSON.parse(currentData);
+    localStorage.setItem('user', JSON.stringify({
+      ...parsedData,
+      user: { ...parsedData.user, ...userData }
+    }));
+  }
+}; 
