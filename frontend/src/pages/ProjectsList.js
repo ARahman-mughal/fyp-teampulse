@@ -1,127 +1,134 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Table, Button, Alert, Spinner } from 'react-bootstrap';
-import { getProjects } from '../services/projectService';
-import { useAuth } from '../context/AuthContext';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Container,
+  Paper,
+  Typography,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  IconButton,
+  CircularProgress,
+  Alert,
+} from '@mui/material';
+import { Edit, Delete, Add } from '@mui/icons-material';
+import axios from 'axios';
 
 const ProjectsList = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { user } = useAuth();
-
-  const isAdmin = user?.role === 'admin' || user?.isAdmin;
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await getProjects();
-        setProjects(data);
-      } catch (err) {
-        setError(err.response?.data?.message || 'Failed to load projects');
-        console.error('API Error:', err.response);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchProjects();
   }, []);
 
+  const fetchProjects = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/api/projects', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setProjects(response.data);
+      setLoading(false);
+    } catch (error) {
+      setError('Error fetching projects');
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this project?')) {
+      try {
+        const token = localStorage.getItem('token');
+        await axios.delete(`/api/projects/${id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        fetchProjects();
+      } catch (error) {
+        setError('Error deleting project');
+      }
+    }
+  };
+
   if (loading) {
     return (
-      <div className="text-center my-5">
-        <Spinner animation="border" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </Spinner>
-      </div>
+      <Container sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+        <CircularProgress />
+      </Container>
     );
   }
 
   return (
-    <div className="container py-4">
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2>Projects</h2>
-          <Link to="/projects/new" className="btn btn-primary">
-            Add Project
-          </Link>
-      </div>
-
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       {error && (
-        <Alert variant="danger" className="mb-4" dismissible onClose={() => setError(null)}>
+        <Alert severity="error" sx={{ mb: 2 }}>
           {error}
-          <Button variant="outline-danger" size="sm" className="ms-3" onClick={() => window.location.reload()}>
-            Retry
-          </Button>
         </Alert>
       )}
 
-      {projects.length > 0 ? (
-        <Table striped bordered hover responsive className="mt-3">
-          <thead className="table-dark">
-            <tr>
-              <th>Name</th>
-              <th>Description</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {projects.map((project) => (
-              <tr key={project._id}>
-                <td>
-                  <Link to={`/projects/${project._id}`}>{project.name}</Link>
-                </td>
-                <td>{project.description || '-'}</td>
-                <td>
-                  <span className={`badge bg-${getStatusVariant(project.status)}`}>
-                    {project.status}
-                  </span>
-                </td>
-                <td>
-                  <div className="d-flex gap-2">
-                    <Link
-                      to={`/projects/${project._id}`}
-                      className="btn btn-sm btn-outline-primary"
-                    >
-                      View
-                    </Link>
-                    {isAdmin && (
-                      <Link
-                        to={`/projects/${project._id}/edit`}
-                        className="btn btn-sm btn-outline-secondary"
-                      >
-                        Edit
-                      </Link>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      ) : (
-        <div className="text-center py-5 border rounded">
-          <i className="fas fa-folder-open fa-3x text-muted mb-3"></i>
-          <h4>No Projects Found</h4>
-          <p className="text-muted mb-4">Get started by creating your first project</p>
-          <Link to="/projects/new" className="btn btn-primary">
-            <i className="fas fa-plus me-2"></i>Create Project
-          </Link>
+      <Paper sx={{ p: 2 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <Typography variant="h5" component="h2">
+            Projects
+          </Typography>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<Add />}
+            onClick={() => navigate('/projects/new')}
+          >
+            Add Project
+          </Button>
         </div>
-      )}
-    </div>
-  );
-};
 
-const getStatusVariant = (status) => {
-  switch (status) {
-    case 'Completed': return 'success';
-    case 'In Progress': return 'primary';
-    case 'On Hold': return 'warning';
-    default: return 'secondary';
-  }
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Name</TableCell>
+                <TableCell>Description</TableCell>
+                <TableCell>Start Date</TableCell>
+                <TableCell>End Date</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {projects.map((project) => (
+                <TableRow key={project._id}>
+                  <TableCell>{project.name}</TableCell>
+                  <TableCell>{project.description}</TableCell>
+                  <TableCell>{new Date(project.startDate).toLocaleDateString()}</TableCell>
+                  <TableCell>{new Date(project.endDate).toLocaleDateString()}</TableCell>
+                  <TableCell>{project.status}</TableCell>
+                  <TableCell>
+                    <IconButton
+                      color="primary"
+                      onClick={() => navigate(`/projects/${project._id}/edit`)}
+                    >
+                      <Edit />
+                    </IconButton>
+                    <IconButton
+                      color="error"
+                      onClick={() => handleDelete(project._id)}
+                    >
+                      <Delete />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+    </Container>
+  );
 };
 
 export default ProjectsList;

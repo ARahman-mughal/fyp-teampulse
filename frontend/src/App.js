@@ -1,71 +1,70 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { Provider } from 'react-redux';
+import { ThemeProvider, createTheme } from '@mui/material';
+import store from './store';
 import { AuthProvider } from './context/AuthContext';
-import { EmployeeProvider } from './context/EmployeeContext';
-import Header from './components/Header';
-import Footer from './components/Footer';
+
+// Layouts
+import MainLayout from './components/Layout/MainLayout';
+
+// Public Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
+
+// Protected Pages
 import Dashboard from './pages/Dashboard';
-import EmployeeForm from './components/EmployeeForm';
-import './styles/main.css';
-import './styles/variables.css';
-import './App.css';
-import PayrollList from './components/PayrollList';
-import PayrollForm from './components/PayrollForm';
-import PayrollDetail from './components/PayrollDetail';
-import 'bootstrap/dist/css/bootstrap.min.css';
-import EmployeeList from './components/EmployeeList';
-// Project imports (ONLY ONE SET OF THESE)
-import ProjectsList from './pages/ProjectsList';
-import ProjectForm from './pages/ProjectForm';
-import ProjectDetails from './pages/ProjectDetails';
+import Profile from './pages/Profile';
+import LeaveRequests from './pages/LeaveRequests';
+import Employees from './pages/Employees';
+import Projects from './pages/Projects';
+import Payroll from './pages/Payroll';
 
-
-// new for leaves
-// Add these imports with your other page imports
-import LeavesList from './pages/LeavesList';
-import LeaveForm from './pages/LeaveForm';
-import LeaveDetails from './pages/LeaveDetails';
-
-
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: '#1976d2',
+    },
+    secondary: {
+      main: '#dc004e',
+    },
+    background: {
+      default: '#f5f5f5',
+    },
+  },
+  typography: {
+    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+  },
+});
 
 function App() {
   return (
-    <Router>
+    <Provider store={store}>
       <AuthProvider>
-        <EmployeeProvider>
-          <div className="d-flex flex-column min-vh-100">
-            <Header />
-            <main className="flex-grow-1">
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/employees" element={<EmployeeList />} />
-                <Route path="/employees/new" element={<EmployeeForm />} />
-                <Route path="/employees/:id" element={<EmployeeForm />} />
-                <Route path="/payrolls" element={<PayrollList />} />
-                <Route path="/payrolls/new" element={<PayrollForm />} />
-                <Route path="/payrolls/:id" element={<PayrollDetail />} />
-                <Route path="/projects" element={<ProjectsList />} />
-                <Route path="/projects/:id" element={<ProjectDetails />} />
-                <Route path="/projects/new" element={<ProjectForm />} />
-                <Route path="/projects/:id/edit" element={<ProjectForm />} />
-                
-                <Route path="/leaves" element={<LeavesList />} />
-                <Route path="/leaves/:id" element={<LeaveDetails />} />
-                <Route path="/leaves/new" element={<LeaveForm />} />
-                <Route path="/leaves/:id/edit" element={<LeaveForm />} />
-    
-              </Routes>
-            </main>
-            <Footer />
-          </div>
-        </EmployeeProvider>
+        <ThemeProvider theme={theme}>
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            
+            {/* Protected Routes */}
+            <Route path="/" element={<MainLayout />}>
+              <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="profile" element={<Profile />} />
+              <Route path="leave-requests" element={<LeaveRequests />} />
+              <Route path="employees" element={<Employees />} />
+              <Route path="projects" element={<Projects />} />
+              <Route path="payroll" element={<Payroll />} />
+            </Route>
+
+            {/* Catch all - replace with 404 page if needed */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </ThemeProvider>
       </AuthProvider>
-    </Router>
+    </Provider>
   );
 }
-
 
 export default App;

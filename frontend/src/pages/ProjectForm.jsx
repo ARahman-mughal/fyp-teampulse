@@ -1,210 +1,174 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Form, Button, Row, Col, Alert, Spinner } from 'react-bootstrap';
+import {
+  Container,
+  Paper,
+  Typography,
+  TextField,
+  Button,
+  Grid,
+  MenuItem,
+  Alert,
+  CircularProgress,
+} from '@mui/material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { getEmployees } from '../services/employeeService';
 import { createProject, getProjectById, updateProject } from '../services/projectService';
 import { useAuth } from '../context/AuthContext';
 
 const ProjectForm = () => {
-  const navigate = useNavigate();
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
 
   const [employees, setEmployees] = useState([]);
-  const [project, setProject] = useState({
+  const [loading, setLoading] = useState(id ? true : false);
+  const [error, setError] = useState(null);
+  const [formData, setFormData] = useState({
     name: '',
     description: '',
-    startDate: '',
-    endDate: '',
+    startDate: null,
+    endDate: null,
     status: 'Planning',
-    employees: [],
+    budget: '',
+    team: [],
   });
 
-  const [loading, setLoading] = useState(false);
-  const [formLoading, setFormLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [validationError, setValidationError] = useState(null);
-
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setError(null);
-        const [employeeData, projectData] = await Promise.all([
-          getEmployees(),
-          id ? getProjectById(id) : Promise.resolve(null)
-        ]);
-        setEmployees(employeeData);
-        if (projectData) setProject(projectData);
-      } catch (err) {
-        setError(err?.response?.data?.message || 'Failed to load data');
-        console.error('Form load error:', err);
-      } finally {
-        setFormLoading(false);
-      }
-    };
-
-    fetchData();
+    if (id) {
+      fetchProject();
+    }
   }, [id]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setProject(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleEmployeeSelect = (e) => {
-    const selected = Array.from(e.target.selectedOptions, option => option.value);
-    setProject(prev => ({ ...prev, employees: selected }));
-  };
-
-  const validateForm = () => {
-    if (!project.name || !project.startDate) {
-      return 'Project Name and Start Date are required.';
-    }
-    if (project.endDate && project.endDate < project.startDate) {
-      return 'End Date cannot be earlier than Start Date.';
-    }
-    return null;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    const validationMsg = validateForm();
-    if (validationMsg) {
-      setValidationError(validationMsg);
-      return;
-    }
-
+  const fetchProject = async () => {
     try {
-      setLoading(true);
-      setValidationError(null);
-      setError(null);
-
-      const payload = {
-        ...project,
-        createdBy: user._id
-      };
-
-      if (id) {
-        await updateProject(id, payload);
-      } else {
-        await createProject(payload);
-      }
-
-      navigate('/projects', {
-        state: { success: `Project ${id ? 'updated' : 'created'} successfully!` }
+      const response = await getProjectById(id);
+      setFormData({
+        ...response,
+        startDate: new Date(response.startDate),
+        endDate: response.endDate ? new Date(response.endDate) : null,
       });
-    } catch (err) {
-      setError(err?.response?.data?.message || 'Failed to save project');
-      console.error('Save error:', err);
-    } finally {
+      setLoading(false);
+    } catch (error) {
+      setError('Error fetching project data');
       setLoading(false);
     }
   };
 
-  if (formLoading) {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (id) {
+        await updateProject(id, formData);
+      } else {
+        await createProject(formData);
+      }
+      navigate('/projects');
+    } catch (error) {
+      setError(error.response?.data?.message || 'Error saving project');
+    }
+  };
+
+  const handleChange = (field) => (event) => {
+    setFormData({
+      ...formData,
+      [field]: event.target ? event.target.value : event,
+    });
+  };
+
+  if (loading) {
     return (
-      <div className="text-center my-5">
-        <Spinner animation="border" />
-        <p>Loading form...</p>
-      </div>
+      <Container sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+        <CircularProgress />
+      </Container>
     );
   }
 
   return (
-    <div className="container my-4">
-      <h2 className="mb-4">{id ? 'Edit Project' : 'Create New Project'}</h2>
+    <LocalizationProvider dateAdapter={AdapterDateFns}>
+      <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
 
-      {error && <Alert variant="danger">{error}</Alert>}
-      {validationError && <Alert variant="warning">{validationError}</Alert>}
-
-      <Form onSubmit={handleSubmit}>
-        <Row className="mb-3">
-          <Form.Group as={Col} md={6}>
-            <Form.Label>Project Name *</Form.Label>
-            <Form.Control
-              type="text"
-              name="name"
-              value={project.name}
-              onChange={handleChange}
-              required
-            />
-          </Form.Group>
-
-          <Form.Group as={Col} md={6}>
-            <Form.Label>Status</Form.Label>
-            <Form.Select
-              name="status"
-              value={project.status}
-              onChange={handleChange}
-            >
-              <option value="Planning">Planning</option>
-              <option value="In Progress">In Progress</option>
-              <option value="On Hold">On Hold</option>
-              <option value="Completed">Completed</option>
-            </Form.Select>
-          </Form.Group>
-        </Row>
-
-        <Form.Group className="mb-3">
-          <Form.Label>Description</Form.Label>
-          <Form.Control
-            as="textarea"
-            name="description"
-            rows={3}
-            value={project.description}
-            onChange={handleChange}
-            placeholder="Enter a brief description of the project..."
-          />
-        </Form.Group>
-
-        <Row className="mb-3">
-          <Form.Group as={Col} md={6}>
-            <Form.Label>Start Date *</Form.Label>
-            <Form.Control
-              type="date"
-              name="startDate"
-              value={project.startDate}
-              onChange={handleChange}
-              required
-            />
-          </Form.Group>
-
-          <Form.Group as={Col} md={6}>
-            <Form.Label>End Date</Form.Label>
-            <Form.Control
-              type="date"
-              name="endDate"
-              value={project.endDate}
-              onChange={handleChange}
-              min={project.startDate}
-            />
-          </Form.Group>
-        </Row>
-
-        <Form.Group className="mb-4">
-          <Form.Label>Assign Team Members</Form.Label>
-          <Form.Select
-            multiple
-            name="employees"
-            value={project.employees}
-            onChange={handleEmployeeSelect}
-          >
-            {employees.map(emp => (
-              <option key={emp._id} value={emp._id}>
-                {emp.firstName} {emp.lastName}
-              </option>
-            ))}
-          </Form.Select>
-        </Form.Group>
-
-        <div className="d-flex justify-content-end">
-          <Button type="submit" variant="success" disabled={loading}>
-            {loading ? 'Saving...' : id ? 'Update Project' : 'Create Project'}
-          </Button>
-        </div>
-      </Form>
-    </div>
+        <Paper sx={{ p: 4 }}>
+          <Typography variant="h5" gutterBottom>
+            {id ? 'Edit Project' : 'Create New Project'}
+          </Typography>
+          <form onSubmit={handleSubmit}>
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <TextField
+                  name="name"
+                  label="Project Name"
+                  value={formData.name}
+                  onChange={handleChange('name')}
+                  fullWidth
+                  required
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  name="description"
+                  label="Description"
+                  value={formData.description}
+                  onChange={handleChange('description')}
+                  fullWidth
+                  multiline
+                  rows={4}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <DatePicker
+                  label="Start Date"
+                  value={formData.startDate}
+                  onChange={handleChange('startDate')}
+                  renderInput={(params) => <TextField {...params} fullWidth />}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <DatePicker
+                  label="End Date"
+                  value={formData.endDate}
+                  onChange={handleChange('endDate')}
+                  renderInput={(params) => <TextField {...params} fullWidth />}
+                  minDate={formData.startDate}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  select
+                  name="status"
+                  label="Status"
+                  value={formData.status}
+                  onChange={handleChange('status')}
+                  fullWidth
+                >
+                  <MenuItem value="Planning">Planning</MenuItem>
+                  <MenuItem value="In Progress">In Progress</MenuItem>
+                  <MenuItem value="On Hold">On Hold</MenuItem>
+                  <MenuItem value="Completed">Completed</MenuItem>
+                </TextField>
+              </Grid>
+              <Grid item xs={12}>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="primary"
+                  fullWidth
+                >
+                  {id ? 'Update Project' : 'Create Project'}
+                </Button>
+              </Grid>
+            </Grid>
+          </form>
+        </Paper>
+      </Container>
+    </LocalizationProvider>
   );
 };
 

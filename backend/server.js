@@ -12,7 +12,8 @@ const authRoutes = require('./routes/authRoutes');
 const employeesRoutes = require('./routes/employeeRoutes');
 const payrollsRoutes = require('./routes/payrollsRoutes');
 const projectRoutes = require('./routes/projectRoutes');
-const leaveRoutes = require('./routes/leaveRoutes')
+const leaveRoutes = require('./routes/leaveRoutes');
+const attendanceRoutes = require('./routes/attendance');
 
 const app = express();
 
@@ -39,17 +40,20 @@ app.use((err, req, res, next) => {
 app.options('*', cors());
 
 // Database connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/employee_management')
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.error('MongoDB connection error:', err));
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/employee_management', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+.then(() => console.log('Connected to MongoDB'))
+.catch(err => console.error('MongoDB connection error:', err));
 
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/employees', employeesRoutes);
 app.use('/api/payrolls', payrollsRoutes);
 app.use('/api/projects', projectRoutes);
-app.use('/api/leaves', leaveRoutes)
-
+app.use('/api/leaves', leaveRoutes);
+app.use('/api/attendance', attendanceRoutes);
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {

@@ -44,13 +44,19 @@ export const register = async (userData) => {
 
 export const login = async (userData) => {
   try {
+    if (!userData.email || !userData.password) {
+      throw new Error('Email and password are required');
+    }
+    
     const response = await API.post('/auth/login', userData);
     
-    if (response.data?.token) {
-      const { token, ...user } = response.data;
-      localStorage.setItem('userToken', token);
-      localStorage.setItem('currentUser', JSON.stringify(user));
+    if (!response.data || !response.data.token) {
+      throw new Error('Invalid response from server');
     }
+    
+    // Store token and user data in localStorage
+    localStorage.setItem('userToken', response.data.token);
+    localStorage.setItem('currentUser', JSON.stringify(response.data));
     
     return response.data;
   } catch (error) {

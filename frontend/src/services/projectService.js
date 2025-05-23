@@ -26,6 +26,11 @@ export const deleteProject = async (id) => {
 };
 
 export const getProjectStats = async () => {
-  const response = await API.get('/projects/stats');
-  return response.data;
+  try {
+    const response = await API.get('/projects/stats');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching project stats:', error);
+    throw error;
+  }
 };

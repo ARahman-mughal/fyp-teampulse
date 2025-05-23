@@ -1,26 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getProjectStats } from '../services/projectService';
-import { useAuth } from '../context/AuthContext';
 import { getEmployeeStats } from '../services/employeeService';
+import { useSelector } from 'react-redux';
+import {
+  Container,
+  Grid,
+  Typography,
+  Box,
+  Button,
+  CircularProgress,
+  Card,
+  CardContent,
+  Chip,
+  Alert,
+  IconButton,
+} from '@mui/material';
+import { Add as AddIcon, Refresh as RefreshIcon } from '@mui/icons-material';
 
 const Dashboard = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [employees, setEmployees] = useState([])
-  const { user, isAdmin } = useAuth();
+  const [employees, setEmployees] = useState([]);
+  const { user, isAuthenticated } = useSelector((state) => state.auth);
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        if (!user) return;
+        if (!isAuthenticated) return;
         setLoading(true);
         setError(null);
         const response = await getProjectStats();
         setProjects(response);
-
-        console.log(response)
       } catch (err) {
         setError(err.response?.data?.message || err.message || 'Failed to load projects.');
         setProjects([]);
@@ -31,14 +44,13 @@ const Dashboard = () => {
 
     const fetchEmployees = async () => {
       try {
-        if (!user) return;
+        if (!isAuthenticated) return;
         setLoading(true);
         setError(null);
         const response = await getEmployeeStats();
-        setEmployees(response)
+        setEmployees(response);
       } catch (err) {
-        setError(err.response?.data?.message || err.message || 'Failed to load projects.');
-        setProjects([]);
+        setError(err.response?.data?.message || err.message || 'Failed to load employees.');
       } finally {
         setLoading(false);
       }
@@ -46,134 +58,150 @@ const Dashboard = () => {
 
     fetchProjects();
     fetchEmployees();
-  }, [user]);
+  }, [isAuthenticated]);
 
   const getStatusColor = (status) => {
     switch (status) {
       case 'Completed': return 'success';
       case 'In Progress': return 'primary';
       case 'On Hold': return 'warning';
-      default: return 'secondary';
+      default: return 'default';
     }
   };
 
   if (loading) {
     return (
-      <div className="text-center my-5">
-        <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </div>
-      </div>
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh">
+        <CircularProgress />
+      </Box>
     );
   }
 
   return (
-    <div className="container my-5">
-      <div className="row mb-4">
-        <div className="col">
-          <h2 className="fw-bold">Dashboard</h2>
-        </div>
+    <Container sx={{ mt: 4, mb: 4 }}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
+        <Typography variant="h4" component="h1" fontWeight="bold">
+          Dashboard
+        </Typography>
         {isAdmin && (
-          <div className="col text-end">
-            <Link to="/projects/new" className="btn btn-primary">
-              <i className="fas fa-plus me-2"></i>Add Project
-            </Link>
-          </div>
+          <Button
+            component={Link}
+            to="/projects/new"
+            variant="contained"
+            startIcon={<AddIcon />}
+          >
+            Add Project
+          </Button>
         )}
-      </div>
+      </Box>
 
       {error && (
-        <div className="alert alert-danger">
+        <Alert
+          severity="error"
+          action={
+            <IconButton
+              color="inherit"
+              size="small"
+              onClick={() => window.location.reload()}
+            >
+              <RefreshIcon />
+            </IconButton>
+          }
+          sx={{ mb: 3 }}
+        >
           {error}
-          <button className="btn btn-sm btn-outline-danger ms-2" onClick={() => window.location.reload()}>
-            Retry
-          </button>
-        </div>
+        </Alert>
       )}
 
-      <div className="row g-4">
-        {/* Common card styles */}
-        <style>
-          {`
-            .dashboard-card {
-              height: 250px;
-              display: flex;
-              flex-direction: column;
-              justify-content: space-between;
-            }
-            .dashboard-scroll {
-              overflow-y: auto;
-              max-height: 170px;
-            }
-            .dashboard-scroll::-webkit-scrollbar {
-              width: 6px;
-            }
-            .dashboard-scroll::-webkit-scrollbar-thumb {
-              background-color: #ccc;
-              border-radius: 4px;
-            }
-          `}
-        </style>
-
+      <Grid container spacing={3}>
         {/* All Projects */}
-        <div className="col-md-6 col-lg-3">
-          <div className="card dashboard-card shadow-sm bg-dark text-white">
-            <div className="card-body">
-              <h5 className="card-title">All Projects</h5>
-              <p className="display-6">{projects.totalProjects}</p>
-            </div>
-          </div>
-        </div>
+        <Grid item xs={12} md={6} lg={3}>
+          <Card sx={{ bgcolor: 'grey.900', color: 'white', height: '100%' }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                All Projects
+              </Typography>
+              <Typography variant="h3">
+                {projects.totalProjects || 0}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
 
         {/* Active Projects */}
-        <div className="col-md-6 col-lg-3">
-          <div className="card dashboard-card shadow-sm bg-primary text-white">
-            <div className="card-body">
-              <h5 className="card-title">Active Projects</h5>
-              <p className="display-6">{projects.activeProjects}</p>
-            </div>
-          </div>
-        </div>
+        <Grid item xs={12} md={6} lg={3}>
+          <Card sx={{ bgcolor: 'primary.main', color: 'white', height: '100%' }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Active Projects
+              </Typography>
+              <Typography variant="h3">
+                {projects.activeProjects || 0}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
 
-        {/* Recent Projects (Scrollable) */}
-        <div className="col-md-6 col-lg-3">
-          <div className="card dashboard-card shadow-sm">
-            <div className="card-body">
-              <h5 className="card-title">Recent Projects</h5>
-              <div className="dashboard-scroll">
-                {projects?.recentQuarterProjects?.count ? projects.recentQuarterProjects.projects.map((p) => (
-                  <div key={p._id} className="mb-2">
-                    <Link to={`/projects/${p._id}`} className="fw-semibold text-decoration-none d-block">
-                      {p.name}
-                    </Link>
-                    <span className={`badge bg-${getStatusColor(p.status)}`}>{p.status}</span>
-                  </div>
-                )) : (
-                  <p className="text-muted">No recent projects.</p>
+        {/* Recent Projects */}
+        <Grid item xs={12} md={6} lg={3}>
+          <Card sx={{ height: '100%' }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Recent Projects
+              </Typography>
+              <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+                {projects?.recentQuarterProjects?.count ? (
+                  projects.recentQuarterProjects.projects.map((p) => (
+                    <Box key={p._id} sx={{ mb: 2 }}>
+                      <Link
+                        to={`/projects/${p._id}`}
+                        style={{ textDecoration: 'none', color: 'inherit' }}
+                      >
+                        <Typography variant="subtitle1" gutterBottom>
+                          {p.name}
+                        </Typography>
+                      </Link>
+                      <Chip
+                        label={p.status}
+                        color={getStatusColor(p.status)}
+                        size="small"
+                      />
+                    </Box>
+                  ))
+                ) : (
+                  <Typography color="text.secondary">
+                    No recent projects.
+                  </Typography>
                 )}
-              </div>
-            </div>
-          </div>
-        </div>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
 
-        {/* New Employees (Scrollable Dummy) */}
-        <div className="col-md-6 col-lg-3">
-          <div className="card dashboard-card shadow-sm">
-            <div className="card-body">
-              <h5 className="card-title">New Employees</h5>
-              <div className="dashboard-scroll">
+        {/* New Employees */}
+        <Grid item xs={12} md={6} lg={3}>
+          <Card sx={{ height: '100%' }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                New Employees
+              </Typography>
+              <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
                 {employees.map((emp, idx) => (
-                  <div key={idx} className="mb-2">
-                    <strong>{emp.name}</strong><br />
-                    <small>{emp.role} — {emp.joined}</small>
-                  </div>
+                  <Box key={idx} sx={{ mb: 2 }}>
+                    <Typography variant="subtitle1">
+                      {emp.name}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {emp.role} — {emp.joined}
+                    </Typography>
+                  </Box>
                 ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+    </Container>
   );
 };
 
